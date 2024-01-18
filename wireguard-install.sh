@@ -563,9 +563,10 @@ else
 	echo "   1) Add a new client"
 	echo "   2) Remove an existing client"
 	echo "   3) Remove WireGuard"
-	echo "   4) Exit"
+	echo "   4) Add a Site-to-Site tunnel"
+	echo "   5) Exit"
 	read -p "Option: " option
-	until [[ "$option" =~ ^[1-4]$ ]]; do
+	until [[ "$option" =~ ^[1-5]$ ]]; do
 		echo "$option: invalid selection."
 		read -p "Option: " option
 	done
@@ -736,6 +737,60 @@ else
 			exit
 		;;
 		4)
+		### We need to know:
+		### 1) Endpoint name
+		### 2) Endpoint IP/FQDN and port
+		### 3) Endpoint public key
+		### 4) Endpoint remote subnet
+			echo
+			echo "Creating S2S Tunnel"
+			echo "Provide a name for the site:"
+			read -p "Name: " unsanitized_name
+			# Allow a limited set of characters to avoid conflicts
+			name=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_name")
+			while [[ -z "$name" ]] || grep -q "^# BEGIN_PEER $name$" /etc/wireguard/wg0.conf; do
+				echo "$name: invalid name."
+				read -p "Name: " unsanitized_name
+				name=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_name")
+			done
+			echo
+			echo "What is the network of the remote side?"
+			echo "Example: (10.1.2.0)"
+			read -p "Network: " network
+
+			validateIP $network
+
+			if [[ $? -ne 0 ]]; then
+				echo "Invalid IP Address ($network)"
+				exit
+			fi
+
+			echo
+			echo "What is the subnet of the remote side?"
+			echo "Example (/22)"
+			read -p "Subnet: /" subnet
+
+			if ! [[ $subnet -ge 1 && $subnet -le 32 ]]; then
+			echo "Invalid subnet"
+			exit
+			fi
+
+			echo
+			echo "What is the endpoint? Either IP address or FQDN"
+			echo "No typos please."
+			echo "Example (1.2.3.4:51820 or site.domain.com:51820)"
+			read -p "Endpoint: " endpoint
+
+			echo
+			echo "What is the public key of the remote side?"
+			echo "Example (CKLT7hWdC0WeSPwvmpb4pX2X3YP8U+l7gV+VwQ1/l3g=)"
+			read -p "Public Key: " pub_key
+
+			new_s2s_setup
+
+			exit
+		;;
+		5)
 			exit
 		;;
 	esac
