@@ -474,10 +474,12 @@ EOF
 Before=network.target
 [Service]
 Type=oneshot
+ExecStart=$iptables_path -t nat -A POSTROUTING -s 172.31.255.0/24 -d 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 -j RETURN
 ExecStart=$iptables_path -t nat -A POSTROUTING -s 172.31.255.0/24 ! -d 172.31.255.0/24 -j SNAT --to $ip
 ExecStart=$iptables_path -I INPUT -p udp --dport $port -j ACCEPT
 ExecStart=$iptables_path -I FORWARD -s 172.31.255.0/24 -j ACCEPT
 ExecStart=$iptables_path -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+ExecStop=$iptables_path -t nat -D POSTROUTING -s 172.31.255.0/24 -d 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 -j RETURN
 ExecStop=$iptables_path -t nat -D POSTROUTING -s 172.31.255.0/24 ! -d 172.31.255.0/24 -j SNAT --to $ip
 ExecStop=$iptables_path -D INPUT -p udp --dport $port -j ACCEPT
 ExecStop=$iptables_path -D FORWARD -s 172.31.255.0/24 -j ACCEPT
@@ -561,7 +563,7 @@ else
 	echo
 	echo "Select an option:"
 	echo "   1) Add a new client"
-	echo "   2) Remove an existing client"
+	echo "   2) Remove an existing client or tunnel"
 	echo "   3) Remove WireGuard"
 	echo "   4) Add a Site-to-Site tunnel"
 	echo "   5) Exit"
@@ -788,6 +790,8 @@ else
 
 			new_s2s_setup
 
+			# Append new S2S configuration to the WireGuard interface
+			wg addconf wg0 <(sed -n "/^# BEGIN_PEER $name/,/^# END_PEER $name/p" /etc/wireguard/wg0.conf)
 			exit
 		;;
 		5)
